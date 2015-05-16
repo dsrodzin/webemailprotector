@@ -1,0 +1,493 @@
+<?php
+
+/**
+ * @file
+ * This module implements WebEmailProtector technique (http://www.webemailprotector.com ) for hiding email addresses from spambots.
+ *
+ * @author David Srodzinski
+ * @copyright 20014-2015, David Srodzinski
+ * @license http://www.gnu.org/licenses/gpl.txt  GPL v 2.0
+ *
+ */
+
+/**
+ * Implements hook_help().
+ */
+function webemailprotector_help($path, $arg) {
+  $wep_name='<span style="color:blue;">Web</span><span style="color:green;">Email</span><span style="color:red;">Protector</span>';
+  if ($path == 'admin/help#webemailprotector') {
+    return t('<h1>Welcome to the Drupal7 '.$wep_name.' Module Help Page.</h1>'
+	.'Email address anti-spam protection for your website. '
+	.'With 100% satisfaction amongst its users so far we hope you like it too - but please review and leave your comments!<br/ ><br />'
+    .'Using '.$wep_name.' you can more confidently list email addresses on your website and hide them from being scraped and harvested by spammers and the like. '
+    .'This is the strongest email obfuscator available - plugin, module or otherwise, and likely the only one that actually works. '
+	.'This is because all others are based on Javascript "encoders" that try to hide your email. '
+    .'But, because both the email addresses and the coding scheme are given away by the web page and with the rise of Javascript interpreters, these methods are no longer effective. '
+	.'Ours works a different way -> visit <a href="www.webemailprotector.com">www.webemailprotector.com</a> for more information. <br /><br />'
+	.'So stop spammers, phishing, virus attacks and ID theft perpetrators at source and keep your address private. '
+	.'Simple to use and fully supported.<br /><br />'
+	.'<h2><u>Registration and Validation Instructions:</u></h2>'
+    . '<p>  Each email address needs to be both registered and then validated with us in order for you to use it. '
+	. 'You do this from the <a href="?q=admin/settings/webemailprotector">Configure</a> page.&nbsp;'
+    . '(<i> If you don\'t follow these 2 steps (as below) it will not work! But luckily you should only ever have to do this once per email - even if we update the module</i> ).</p>'
+    . '<p>1. Firstly, to register each email address with us click on the <input id="submit" type="button" class="button add another" value="REGISTER"> button beside the email address.'
+    . '&nbsp(<i> This places a copy of your address'
+    . '<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;on our server. The address must exist as the addressee will need to be able to receive messages to this email in order to confirm their identity</i> ).</p>'
+    . '<p>2. Next, to validate that each registration succeeded and that it is ready to use click on the <input id="submit" type="button" class="button add another" value="VALIDATE"> button beside the email address.'
+    . '<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(<i> You will be able to tell that the email address registration was successful '
+    . 'because you get a pop-up confirmation message to say so and the<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;email text color will turn from red to green</i> ).</p>'
+	. '<p>3. And after you make any change on the Configuration you will need to <a href="?q=admin/config/development/performance">clear the Drupal cache</a>, '
+	. 'so that any changes will take effect.'
+    . '<h1><u>To use on a Page</u></h1>'
+    . '<p>4. '.$wep_name.' uses the Drupal standard filters module. Within the filter you must enable the <b>WebEmailProtector</b> filter.'
+    . 'This can be done from the <a href="?q=admin/config/content/formats/filtered_html">Modules->Filter->Configure->Filtered HTML</a> menu.'
+    . '<p>5. To use simply place any of the secured email addresses as a shortcode ie within square brackets on your Drupal pages,'
+    . '<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; menus or widget text <i>e.g. <b>[</b>email@yourdomain.com<b>]</b></i>. (<i> You do not need to place within any "&#60;a&#62;" , "mailto" or other marked-up text</i> ).'
+    . '<p>6. In addition to shortcodes, it also replaces all links that contain your secured email address of the forms '
+    . '<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;mailto:[email@yourdomain.com] or mailto:email@yourdomain.com.</br />'
+    . '<h1><u>Additional Notes:</u></h1>'
+    . '<p>7. The <b>displayed text</b> column is for you to edit and set up as you like. The only excluded characters are \' and " . We strongly suggest that you '
+    . '<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; do not use the email address itself as this will still leave you vulnerable. </p>'
+    . '<p>8. You can add additional email addresses using the <input id="submit" class="button add another" type="button" value="ADD another"> button.</p>'
+    . '<p>9. You can add delete any email addresses using the <input id="delete" class="button add another" type="button" value="DELETE"> button.</p>'
+    . '<p>10. As an option you can change the style of the email address appearance using CSS. For those familiar with CSS use the class "wep_email" of<br>'
+    . '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;the &#60;a&#62; element using the selector a.wep_email {}.'
+    . '&nbsp;A template css file is provided for you to edit the style as you wish.'
+    . '<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;It can be located within the module directory at : webemailprotector/css/webemailprotector_youremailstyle.css.'
+    . '<p><br></p>'
+  );
+ }
+}
+
+
+function webemailprotector_admin() {
+  /*set up nonce security like in WP
+  function webemailprotector_nonce() {
+   return drupal_hmac_base64('webemailprotector', session_id() . drupal_get_private_key() . drupal_get_hash_salt());
+  }
+  $token=webemailprotector_nonce();
+  drupal_add_js(array('security' => array('token' => $token)), array('type' => 'setting'));
+  access in js using Drupal.settings.security.token*/
+  
+  /* SET UP DATABASE AND OTHER INITIALISATIONS */
+   
+  variable_set('wep_ver','v1.1.0');
+  $wep_ver=variable_get('wep_ver');
+  
+  $path = drupal_get_path('module','webemailprotector');
+  $js_pathname=$path.'/scripts/webemailprotector_adminscripts.js';
+  
+  //Pass it to the js
+  drupal_add_js($js_pathname);
+ 
+  drupal_add_library('system', 'drupal.ajax');
+  drupal_add_library('system', 'jquery.form');
+
+  
+  /* RESET ALL THE WEP DB IS SET TRUE, USE WITH CARE! */
+
+  $wep_reset_db = false;
+  // any emails stored?
+  global $user;
+  $wep_current_user_email = $user->mail;
+  //set up version ver
+  $wep_ver='v1.0.0';
+  $wep_init = false;
+  $wep_reason='manual reset';
+	   
+  /* HAS IT BEEN INSTALLED BEFORE ?  */	  
+  if ( !(variable_get('wepdb_wep_ver')) ){
+     $wep_reason='new install';
+	 variable_set('wepdb_wep_ver',$wep_ver);
+	 $wep_init = true;}
+  /* OR IS IT AN UPGRADE ?  */	  
+  elseif (variable_get('wepdb_wep_ver') != $wep_ver){
+     $wep_ver_old=variable_get('wepdb_wep_ver');
+     $wep_reason='upgrade from '.$wep_ver_old;
+	 variable_set('wepdb_wep_ver',$wep_ver);
+	 $wep_init = true;}
+ 
+  $testvar='abc123';
+  $my_settings = array(
+  'testvar' => $testvar
+  );
+ 
+  drupal_add_js(array('webemailprotector' => $my_settings), 'setting');
+ 
+  //log the fact that a new version has been initialised
+  if ( $wep_init ) {
+   drupal_add_js('webemailprotector_emo_init("'.$wep_current_user_email.'","'.$wep_ver.'","'.$wep_reason.'");', 'inline');
+   }
+   if ( ( $wep_reset_db ) or ( !(variable_get('wepdb_nuemails')) ) ){ //THEN ASSUMES FRESH INSTALL
+   variable_set('wepdb_nuemails','5'); //this holds the number stored in the dB
+   variable_set('wepdb_nextemail','6'); //this holds the next one to add to aid delete & refresh operations
+   $wep_nuemails = variable_get('wepdb_nuemails');
+   for ($i = 1;$i <=$wep_nuemails; $i++) {
+	variable_set('wepdb_wep_entry_'.$i,'emo_'.$i);
+	variable_set('wepdb_wep_email_'.$i,'your email address '.$i);
+	variable_set('wepdb_wep_emo_'.$i,'xxxx-xxxx-xxxx-xxxx-xxxx');
+    variable_set('wepdb_wep_display_name_'.$i,'your display text '.$i);
+	variable_set('wepdb_wep_validated_'.$i,'false');
+    }
+  }
+  
+  // if so then load up the data to local variables for displaying
+  if ( variable_get('wepdb_nuemails') ) { 
+   $wep_nextemail = variable_get('wepdb_nextemail');
+   $l=0;
+   for ($i = 1;$i <$wep_nextemail; $i++) {
+    //when refresh get rid of any old db that have been deleted to auto compress db
+	if (variable_get('wepdb_wep_entry_'.$i) == false) { //then has been deleted and need to cleanse that line of the db and shuffle it
+	  //do nowt as empty
+	  }
+	else {
+	 $l++;
+	 variable_set('wepdb_wep_entry_'.$l,'emo_'.$l);
+	 ${'wep_email_'.$l} = variable_get('wepdb_wep_email_'.$i);
+	 variable_set('wepdb_wep_email_'.$l,${'wep_email_'.$l});
+     ${'wep_emo_'.$l} = variable_get('wepdb_wep_emo_'.$i);
+	 variable_set('wepdb_wep_emo_'.$l,${'wep_emo_'.$l});
+     ${'wep_display_name_'.$l} = variable_get('wepdb_wep_display_name_'.$i);
+	 variable_set('wepdb_wep_display_name_'.$l,${'wep_display_name_'.$l});
+     ${'wep_validated_'.$l} = variable_get('wepdb_wep_validated_'.$i);
+	 variable_set('wepdb_wep_validated_'.$l,${'wep_validated_'.$l});
+	 }
+   }
+   //delete any left over crud beyond the emails
+   for ($i = ($l+1); $i <$wep_nextemail; $i++) {
+     if (variable_get('wepdb_wep_entry_'.$i)) {variable_del('wepdb_wep_entry_'.$i);}
+     if (variable_get('wepdb_wep_email_'.$i)) {variable_del('wepdb_wep_email_'.$i);}
+     if (variable_get('wepdb_wep_emo_'.$i)) {variable_del('wepdb_wep_emo_'.$i);}
+     if (variable_get('wepdb_wep_display_name_'.$i)) {variable_del('wepdb_wep_display_name_'.$i);}
+     if (variable_get('wepdb_wep_validated_'.$i)) {variable_del('wepdb_wep_validated_'.$i);}
+    }
+   $wep_nuemails=$l;
+   variable_set('wepdb_nuemails',$l);
+   $wep_nextemail = intval($wep_nuemails)+1;
+   variable_set('wepdb_nextemail',$wep_nextemail); //update on refresh so always pointing to next new one to add
+  }
+  /* THE DISPLAY */
+  drupal_add_css($path . '/css/webemailprotector_adminsettings.css', array('weight' => CSS_THEME));
+  $wep_name='<span style="color:blue;">Web</span><span style="color:green;">Email</span><span style="color:red;">Protector</span>';
+	
+  $form['head'] = array('#markup' => t('<div class="webemailprotector_admin_wrap">'
+  . '<img style="display:inline;margin:0px 0px 0px 60px;vertical-align:middle" src="'.$path.'/images/webemailprotector_logo.png" width="398px" height="102px"/>'
+  . '<h1 style="display:inline;margin:0px 0px 0px 0px;">&nbsp;&nbsp;'.$wep_ver.'&nbsp;&nbsp;&nbsp;Drupal Module Configure Page</h1>'
+  . '<table class="wep_top"><tbody><tr>'
+  . '<td>Enter the email addresses that you wish to secure into the <b>SECURED EMAIL ADDRESS</b> column of the table below:'
+  . '<br /><br />(<i> these must be existing email addresses that you will need to register with us as described under the table</i> ).</td>'
+  . '<td style="width:10px;"></td>'
+  . '<td>Next enter the associated display text into the <b>DISPLAYED TEXT</b> column: <br /><br />(<i> this is the link text that will appear in place of the '
+  . 'email address when your Drupal pages are published</i> ).</td>'
+  . '<td style="width:10px;"></td>'
+  . '<td style="width:200px;">Then under the <b>ACTIONS</b> column, <b>REGISTER</b> and <b>VALIDATE</b> each email you wish to use. '
+  . ' After you make any change to the configuration you will need to <a href="?q=admin/config/development/performance">clear the Drupal cache</a>, '
+  . 'so that any changes will take effect.</td>'
+  . '</tr></tbody></table>'
+  . '<table id="wep_table" class="wep_main"><tbody>'
+  . '<tr>'
+  . '<th colspan="3">secured email address </th>'
+  . '<th>displayed text</th>'
+  . '<th colspan="3">actions</th>'
+  . '</tr>'));
+  
+
+  for ($i = 1;$i <=$wep_nuemails; $i++) {
+   $emo_email = variable_get('wepdb_wep_email_'.$i);
+   $display_name = variable_get('wepdb_wep_display_name_'.$i);
+   $validated = variable_get('wepdb_wep_validated_'.$i);
+   if ($validated == 'false') {$color='color:red';}
+   else {$color='color:green';}
+   $line = 'line'.$i;
+   $form[$line] = array('#markup' => t('<tr id="wep_tablerow_' . $i . '">'
+   . '<td style="font-size:30px;padding:0px;margin:0px;border:0px;width:10px;text-align:right;">[</td>'
+   . '<td><input type="text" id="wep_emailtxt_' . $i . '" style="' . $color . ';" onkeyup="webemailprotector_email_change(\'' . $i . '\',this.value)" name="wep_email_' . $i . '" value="' . $emo_email . '"></td>'
+   . '<td style="font-size:30px;padding:0px;margin:0px;border:0px;width:10px;text-align:left;font-size:30px;">]</td>'
+   . '<td><input type="text" id="wep_displaytxt_'.$i.'" onkeyup="webemailprotector_displayname_change(\''.$i.'\',this.value)" name="wep_name_'.$i.'" value="'.$display_name.'"></td>'
+   . '<td><a id="wep_register_'.$i.'" class="button add another" onclick="webemailprotector_register(\''.$i.'\')">REGISTER</a></td>'   
+   /*. '<td><input id="wep_register_'.$i.'" type="button" class="button add another" value="register" onclick="webemailprotector_register(\''.$i.'\')"></td>'*/
+   . '<td><input id="wep_validate_'.$i.'" type="button" class="button add another" value="VALIDATE" onclick="webemailprotector_validate(\''.$i.'\',\''.$wep_current_user_email.'\')"></td>'
+   . '<td><input id="wep_delete_'.$i.'" type="button" class="button add another" value="DELETE" onclick="webemailprotector_emo_delete(\''.$i.'\')"></td>'
+   . '</tr>'));
+  }
+
+  $form['tail'] = array('#markup' => t('</tbody>'
+  . '<tr><td></td><td><green>green=validated</green>/<red>red=unvalidated</red></td></tr>'
+  . '<tr></tr>'
+  . '<tr><td></td><td>'
+  . '<input id="submit" class="button add another" type="button" value="ADD another" onclick="webemailprotector_emo_new()">'
+  . '</td></tr>'
+  . '<tr></tr>'
+  . '</table>'  
+  ));
+  
+  
+  /*set up the spinner*/
+  
+  $form['spinner'] = array('#markup' => t('<div id="wep_spinner">'
+  . '<img src="'.$path.'/images/wep_spinner.gif"/>'
+  . '<p> please wait while we connect to the server to verify your code . . . </p>'
+  . '</div>'
+  . '<div id="wep_dullout">'
+  . '<p><br></p>'
+  . '</div>'));
+ 
+ $form['moreinfo'] = array('#markup' => t('<p>'
+  . 'For additional must read information on how to use please visit the '.$wep_name.' <a href="?q=admin/help/webemailprotector">Help</a> page'
+  . '</p>'
+  )); 
+ 
+  return system_settings_form($form);
+}
+
+function webemailprotector_menu() {
+
+  $items = array();
+
+  // THIS CREATES THE CONFIG PAGE
+  $items['admin/settings/webemailprotector'] = array(
+    'title' => 'WebEmailProtector',
+    'description' => 'WebEmailProtector Administration settings',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('webemailprotector_admin'),
+    'access arguments' => array('administer filters'),
+    'type' => MENU_LOCAL_TASK,
+   );
+  
+  //THIS CREATES AN ADDITIONAL TAB ON THE FILTER CONFIG MENU
+  $items['admin/config/content/formats/webemailprotector'] = array(
+    'title' => 'WebEmailProtector',
+    'description' => 'WebEmailProtector Administration settings',
+	'page callback' => 'drupal_get_form',
+    'page arguments' => array('webemailprotector_admin'),
+	'access arguments' => array('administer filters'),
+    'type' => MENU_LOCAL_TASK,
+  );
+  
+  
+  $items['webemailprotector_emo_delete_callback/%'] = array(
+    'title' => 'My Custom Callback', 
+    'description' => 'A callback.', 
+    'page callback' => 'webemailprotector_emo_delete', 
+    'page arguments' => array(1),
+    'access arguments' => array('access content'), 
+    'type' => MENU_CALLBACK,
+  );
+
+  $items['webemailprotector_emo_new_callback'] = array(
+    'title' => 'My Custom Callback', 
+    'description' => 'A callback.', 
+    'page callback' => 'webemailprotector_emo_new', 
+    'access arguments' => array('access content'), 
+    'type' => MENU_CALLBACK,
+  );
+
+  $items['webemailprotector_displayname_change_callback/%/%'] = array(
+    'title' => 'My Custom Callback', 
+    'description' => 'A callback.', 
+    'page callback' => 'webemailprotector_displayname_change', 
+    'page arguments' => array(1,2),
+    'access arguments' => array('access content'), 
+    'type' => MENU_CALLBACK,
+  );
+  
+  $items['webemailprotector_email_change_callback/%/%'] = array(
+    'title' => 'My Custom Callback', 
+    'description' => 'A callback.', 
+    'page callback' => 'webemailprotector_email_change', 
+    'page arguments' => array(1,2),
+    'access arguments' => array('access content'), 
+    'type' => MENU_CALLBACK,
+  );
+  
+  $items['webemailprotector_register_callback/%'] = array(
+    'title' => 'My Custom Callback', 
+    'description' => 'A callback.', 
+    'page callback' => 'webemailprotector_register', 
+    'page arguments' => array(1),
+    'access arguments' => array('access content'), 
+    'type' => MENU_CALLBACK,
+  );
+  
+  $items['webemailprotector_emo_unvalidate_callback/%'] = array(
+    'title' => 'My Custom Callback', 
+    'description' => 'A callback.', 
+    'page callback' => 'webemailprotector_emo_unvalidate', 
+    'page arguments' => array(1),
+    'access arguments' => array('access content'), 
+    'type' => MENU_CALLBACK,
+  );
+  
+    $items['webemailprotector_email_get_callback/%'] = array(
+    'title' => 'My Custom Callback', 
+    'description' => 'A callback.', 
+    'page callback' => 'webemailprotector_email_get', 
+    'page arguments' => array(1),
+    'access arguments' => array('access content'), 
+    'type' => MENU_CALLBACK,
+  );
+  
+  $items['webemailprotector_emo_validate_callback/%/%/%/%/%/%/%'] = array(
+    'title' => 'My Custom Callback', 
+    'description' => 'A callback.', 
+    'page callback' => 'webemailprotector_emo_validate', 
+    'page arguments' => array(1,2,3,4,5,6,7),
+    'access arguments' => array('access content'), 
+    'type' => MENU_CALLBACK,
+  );
+  
+  return $items;
+}
+
+require(drupal_get_path('module', 'webemailprotector') . '/admin/webemailprotector_emo_delete.php');
+require(drupal_get_path('module', 'webemailprotector') . '/admin/webemailprotector_emo_new.php');
+require(drupal_get_path('module', 'webemailprotector') . '/admin/webemailprotector_displayname_change.php');
+require(drupal_get_path('module', 'webemailprotector') . '/admin/webemailprotector_email_change.php');
+require(drupal_get_path('module', 'webemailprotector') . '/admin/webemailprotector_register.php');
+require(drupal_get_path('module', 'webemailprotector') . '/admin/webemailprotector_emo_unvalidate.php');
+require(drupal_get_path('module', 'webemailprotector') . '/admin/webemailprotector_email_get.php');
+require(drupal_get_path('module', 'webemailprotector') . '/admin/webemailprotector_emo_validate.php');
+
+function webemailprotector_filter_info() {
+  $filters['WebEmailProtector'] = array(
+    'title' => t('WebEmailProtector'),
+    'description' => t('Email address anti-spam protection for your website.'),
+    'process callback' => 'webemailprotector_filter_process',
+	'prepare callback' => 'webemailprotector_filter_prepare',
+	'settings callback' => 'webemailprotector_filter_setup',
+	'cache' => TRUE,
+  );
+  return $filters;
+}
+
+//THIS IS THE INFO THAT APPEARS ON THE FILTER PAGE ITSELF
+function webemailprotector_filter_setup($form, $form_state, $filter, $format, $defaults, $filters){
+   $wep_name='<span style="color:blue;">Web</span><span style="color:green;">Email</span><span style="color:red;">Protector</span>';
+   $path = drupal_get_path('module','webemailprotector');
+   $settings['webemailprotector1'] = array(
+      '#markup' => t('<h1>Email address anti-spam protection for your website.</h1>'
+	  .'For help please visit the '.$wep_name.' <a href="?q=admin/help/webemailprotector"><b>Help</b></a> page.'
+	  .'To configure please visit the '.$wep_name.' <a href="?q=admin/settings/webemailprotector"><b>Configure</b></a> page. <br /><br/>'
+	  .'And in order to used please enable the <b>WebEmailProtector</b> filter on this, the filter->configure menu.'
+	  ),
+    );
+ return $settings;
+}
+
+// INCLUDE THE JS HEADER SCRIPT IN OUTPUT
+$path = drupal_get_path('module','webemailprotector');
+$js_pathname=$path.'/scripts/webemailprotector_headerscripts.js';
+drupal_add_js($js_pathname);
+
+//INCLUDE THE CSS
+drupal_add_css($path . '/css/webemailprotector_emailstyle.css', array('weight' => CSS_THEME));
+
+// AS ANY EMAIL FORMATS ARE PROCESSED BY SRUPAL NEED TO CREATE INTERMEDIARY CHANGE
+// FROM email@myweb.com -> email --at-- myweb --dot-- com
+
+function webemailprotector_filter_prepare($text, $filter, $format, $langcode, $cache, $cache_id) {
+ //cache_clear_all();
+ $newtext=$text;
+ if ( variable_get('wepdb_nuemails') == true){
+  $wep_nuemails = variable_get('wepdb_nuemails');
+  for ($i = 1;$i <= $wep_nuemails; $i++) {
+   $wep_email = variable_get('wepdb_wep_email_'.$i);
+   $wep_validated = variable_get('wepdb_wep_validated_'.$i);
+   $wep_split=explode('@',$wep_email);
+   if ( ($wep_validated == 'true') && (isset($wep_split[1])) ) {
+     $wep_intermediary = $wep_split[0].' --AT-- '.$wep_split[1];
+     $wep_validated = variable_get('wepdb_wep_validated_'.$i);
+     $newswaptext=$wep_intermediary;
+	 //of form mailto:
+	 $newtext = str_replace('mailto:'.$wep_email,$newswaptext,$newtext);
+	 //of form mailto:[email] - just in case added this way
+	 $newtext = str_replace('mailto:['.$wep_email.']',$newswaptext,$newtext);	 
+     //of form [email]
+	 $newtext = str_replace('['.$wep_email.']',$newswaptext,$newtext);
+	 //of form email
+	 $newtext = str_replace($wep_email,$newswaptext,$newtext);
+   }
+  } 
+ }
+return $newtext;
+}
+
+function webemailprotector_filter_process($text, $filter, $format,$langcode, $cache, $cache_id) {
+ $newtext=$text;
+ //cache_clear_all('*', 'cache', TRUE);
+ //cache_clear_all('*', 'cache_page', TRUE);
+ //cache_clear_all('*', 'cache_menu', TRUE);
+ //cache_clear_all('*', 'cache_filter', TRUE);
+ if ( variable_get('wepdb_nuemails') == true){
+  $wep_nuemails = variable_get('wepdb_nuemails');
+  for ($i = 1;$i <= $wep_nuemails; $i++) {
+    $wep_email = variable_get('wepdb_wep_email_'.$i);
+    $wep_emo = variable_get('wepdb_wep_emo_'.$i);
+    $wep_display_name = variable_get('wepdb_wep_display_name_'.$i);
+	$wep_validated = variable_get('wepdb_wep_validated_'.$i);
+	$wep_split=explode('@',$wep_email);
+	if ( ($wep_validated == 'true') && (isset($wep_split[1])) ) {
+	  $z=0;
+      $wep_intermediary = $wep_split[0].' --AT-- '.$wep_split[1];
+	  $zn= substr_count($newtext, $wep_intermediary); //the number of times in appears on a page
+	  for ($z =0; $z < $zn; $z++){
+	   $newswaptext='<a class="wep_email" id="wepid_'.$i.'_'.$z.'" title="'.$wep_display_name.'">'.$wep_display_name.'</a>';
+	   $newtext = preg_replace('/'.$wep_intermediary.'/',$newswaptext,$newtext,1); 
+	   //$newtext = str_replace($wep_intermediary,$newswaptext,$newtext,1);
+	  }
+	}
+  }
+ }
+ return $newtext;
+}
+
+function webemailprotector_node_insert($node) {
+  drupal_flush_all_caches();
+}
+
+function webemailprotector_node_update($node) {
+  $nodeurl = url('node/'. $node->nid);
+  cache_clear_all($nodeurl, 'cache_page');
+      cache_clear_all('*', 'cache', TRUE);
+    cache_clear_all('*', 'cache_page', TRUE);
+    cache_clear_all('*', 'cache_menu', TRUE);
+    cache_clear_all('*', 'cache_filter', TRUE);
+}
+
+
+function webemailprotector_proc() {
+//INSTEAD OF USING THE FILTER PROCESS USE A POST PROCESSING JAVASCRIPT DOCUMENT WRITE AS FILTERS DONT ALLOW
+//JAVASCRIPT PASSING 
+
+$wep_js='';
+$wep_nuemails = variable_get('wepdb_nuemails');
+
+$wep_js .= '$wep_email=document.getElementsByClassName("wep_email");';
+$wep_js .= '$z=0;';
+for ($i = 1;$i <= $wep_nuemails; $i++) {
+ $wep_js .= '$id'.$i.'=0;';
+}
+$wep_js .= 'for ($z = 0; $z < $wep_email.length; $z++) {';
+for ($i = 1;$i <= $wep_nuemails; $i++) {
+  $wep_emo = '"javascript:emo(\''.variable_get('wepdb_wep_emo_'.$i).'\')"';
+  $wep_js .= 'if ($wep_email[$z].id == "wepid_'.$i.'_".concat($id'.$i.') ) {';
+  $wep_js .= '$wep_email[$z].href='.$wep_emo.';';
+  $wep_js .= '$id'.$i.'++;}';
+}
+$wep_js .= '}';
+
+if ($wep_nuemails >= 1) {
+ drupal_add_js($wep_js,array('type' => 'inline', 'scope' => 'footer', 'weight' => 5));
+}
+}
+
+webemailprotector_proc();
+
+
+
+
+
+function webemailprotector_admin_page($form, &$form_state) {
+  return webemailprotector_admin()->page($form, $form_state);
+}
+

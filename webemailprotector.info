@@ -1,0 +1,8 @@
+name = WebEmailProtector
+description = Stop your website email addresses from being scraped.
+package = "Input filters"
+dependencies[] = filter
+configure = admin/settings/webemailprotector
+version = "7.x-1.2"
+core = "7.x"
+project = "webemailprotector"

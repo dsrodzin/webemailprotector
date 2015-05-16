@@ -1,0 +1,53 @@
+/* wep drupal plugin div css markup */
+
+.webemailprotector_admin_wrap {background:white;margin:0;padding:0;border:0;}
+
+.webemailprotector_admin_wrap button::-moz-focus-inner {border:0;padding:0;}
+
+.webemailprotector_admin_wrap red {color:red;}
+
+.webemailprotector_admin_wrap blue {color:blue;}
+
+.webemailprotector_admin_wrap green {color:green;}
+
+.webemailprotector_admin_wrap a {background:green;border-radius:5px;padding:4px;color:white;text-decoration:none;}
+
+.webemailprotector_admin_wrap p {margin-left:30px;font-size:14px;}
+
+.webemailprotector_admin_wrap h1 {margin-left:100px;margin-top:30px;font-size:18px;color:black;background:white;padding:10px;}
+
+.webemailprotector_admin_wrap h1 red , .webemailprotector_admin_wrap h1 blue , .webemailprotector_admin_wrap h1 green {font-size:24px;}
+
+.webemailprotector_admin_wrap table.wep_main {background:silver;border:3px solid blue; border-radius:15px;margin-top:10px;margin-left:0px;padding:20px;}
+
+.webemailprotector_admin_wrap table.wep_main tr {margin:0px;border:0px;padding:0px}
+
+.webemailprotector_admin_wrap table.wep_main th {font-size:14px;margin:0px;border:0px;padding:0px 0px 0px 20px;vertical-align:middle;}
+
+.webemailprotector_admin_wrap table.wep_main td {margin:0px auto;border:0px;padding:5px;float:none;text-align:center;vertical-align:middle;}
+
+.webemailprotector_admin_wrap table.wep_main p {margin:0px;border:0px;padding:0px}
+
+.webemailprotector_admin_wrap table.wep_main input[type="text"] {text-align:center;vertical-align:middle;padding:5px 0px 5px 0px;margin:0px;border:0px;width:100%;border:1px solid black;border-radius:5px;}
+
+.webemailprotector_admin_wrap table.wep_main input[type="text"]:focus {color:red;}
+
+.webemailprotector_admin_wrap table.wep_main input[type="button"] {margin:0px;border:0px;padding:3px 5px;float:none;text-align:center;font-family: "Helvetica Neue",Helvetica,Arial,sans-serif;font-size:12px;color:black;background-image:none;background-color:#f0f0f0;}
+
+.webemailprotector_admin_wrap table.wep_main td a {margin:0px;border:0px;padding:5px 10px;float:none;text-align:center;border-radius:0px;font-family: "Helvetica Neue",Helvetica,Arial,sans-serif;font-size:12px;color:black;background-image:none;background-color:#f0f0f0;}
+
+.webemailprotector_admin_wrap table.wep_main input[type="button"]:hover {background-color:lightgreen;}
+
+.webemailprotector_admin_wrap table.wep_main td a:hover {background-color:lightgreen;}
+
+.webemailprotector_admin_wrap table.wep_top td {width:300px;vertical-align:top;}
+
+.webemailprotector_admin_wrap #wep_spinner {position:fixed;text-align:centre;width:200px;top:30%;left:40%;margin-left:auto;margin-right:auto;display:none;padding:45px;z-index:1001;background:white;border-radius:15px;border:3px solid blue;}
+
+.webemailprotector_admin_wrap #wep_spinner img {display:block;margin-left:auto;margin-right:auto;}
+
+.webemailprotector_admin_wrap #wep_spinner p {display:block;margin-left:auto;margin-right:auto;text-align:center;}
+
+.webemailprotector_admin_wrap #wep_dullout {display:none;z-index:1000;position:fixed;top:0;left:0;width:100%;height:100%;background:gray;opacity:0.6;filter:alpha(opacity=60);}
+
+.webemailprotector_admin_wrap #wep_dullout p {display:block;}
